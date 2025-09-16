@@ -2,3 +2,6 @@
 *.json
 *.asc
 *.bin
+
+# Ignore macOS Finder metadata files
+.DS_Store
