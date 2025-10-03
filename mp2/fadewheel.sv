@@ -129,6 +129,8 @@ module top (
     end
 
     // Create a sequential logic block to increment PWM duty cycle
+    // duty_cycle_inc/dec store the current output duty cycle with one counting
+    // up and the other counting down, respectively.
     always_ff @(posedge clk) begin
         // If the PWM increment time is reached, continue incrementing
         if(pwm_duty_count == PWM_TIME - 1) begin
@@ -158,7 +160,7 @@ module top (
     assign pwm_inc = (pwm_interval_count > duty_cycle_inc) ? 1'b0 : 1'b1; //logic true reverse for led
     assign pwm_dec = (pwm_interval_count > duty_cycle_dec) ? 1'b0 : 1'b1;
 
-    // Set the LED ouputs based on the current status of each LED
+    // Set the LED outputs based on the current status of each LED
     always_comb begin
         case(red_state)
             STEADY_ON: begin
