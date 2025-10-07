@@ -1,4 +1,4 @@
-filename = fadewheel
+filename = top
 pcf_file = ../common/iceBlinkPico.pcf
 
 build:

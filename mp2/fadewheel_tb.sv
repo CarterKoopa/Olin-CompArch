@@ -1,5 +1,5 @@
 `timescale 10ns/10ns
-`include "fadewheel.sv"
+`include "top.sv"
 
 module fadewheel_tb;
 
