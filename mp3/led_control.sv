@@ -7,7 +7,6 @@
 //
 // Author: Carter Harris
 module led_control #(
-)
     // Define timing constants
     // WS2812 have a code system for a on/off signal where the input is on and
     // then off for a specified period of time, per their datasheet. The time
@@ -15,18 +14,19 @@ module led_control #(
     //
     // Timings are not quite perfect to the micro-scale specifications of the
     // WS2812B LED, but are within the +/-150ns margin of error. 
-    parameter OFF_HIGH_TIME = 5;  // 0.4us
-    parameter OFF_LOW_TIME =  10; // 0.85us
-    parameter ON_HIGH_TIME =  10; // 0.8us
-    parameter ON_LOW_TIME =   5;  // 0.45us
-    parameter TICKS_PER_CYCLE = ON_HIGH_TIME + ON_LOW_TIME;
-    parameter BITS_PER_LED = 24;
+    parameter OFF_HIGH_TIME = 5,  // 0.4us
+    parameter OFF_LOW_TIME = 10, // 0.85us
+    parameter ON_HIGH_TIME = 10, // 0.8us
+    parameter ON_LOW_TIME = 5, // 0.45us
+    parameter TICKS_PER_CYCLE = ON_HIGH_TIME + ON_LOW_TIME,
+    parameter BITS_PER_LED = 24
+)
 (
     input logic clk,
     input logic [23:0] rgb_input,
     input logic resetting,
-    output logic led_signal,
-    output logic next_led
+    output logic next_led,
+    output logic led_signal
 );
     // This first section only deals with creating the on-off code for each
     // individual bit of the LED. Actually assigning to the output based on the
@@ -35,11 +35,11 @@ module led_control #(
     // Create counters
     logic [$clog2(TICKS_PER_CYCLE) - 1:0] current_cycle_count = 0;
     logic [$clog2(BITS_PER_LED)    - 1:0] current_bit = BITS_PER_LED - 1;
-    logic on_code_signal = 1'b0;
-    logic off_code_signal = 1'b0;
+    logic on_code_signal;
+    logic off_code_signal;
 
     initial begin
-        next_led = 1'b0;
+        next_led = 0;
     end
     
     // Count ticks in the current bit cycle
