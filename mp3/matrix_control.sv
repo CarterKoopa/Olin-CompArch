@@ -2,7 +2,7 @@
 // Mini-Project 3 - Game of Life
 // Olin Computer Architecture FA25
 //
-// Control an LED matrix of a given sized based around WS2812B LEDs.
+// Control an LED matrix of a given sized based around WS2812B 
 //
 // Author: Carter Harris
 `include "led_control.sv"
@@ -26,6 +26,9 @@ module matrix_control #(
     logic send_reset;
     // Signal from the LED controller counter on when to send the next signal
     logic next_led;
+    // Create a register to store a snapshot of the led_data so that it's not
+    // updated during transmission.
+    logic [NUM_LEDS-1:0][23:0] led_data_snapshot = 0;
 
     // Implement the underlying WS2812B LED Controller
     led_control #(
@@ -44,7 +47,7 @@ module matrix_control #(
 
     // Define state machine states
     typedef enum {TRANSMITTING, RESETTING, IDLE} matrix_state;
-    matrix_state state = RESETTING;
+    matrix_state state;
 
     // This sequential block waits for the signal from the led_control to
     // increment to the next LED in the matrix. This should only occur at the
@@ -90,19 +93,19 @@ module matrix_control #(
     end
     */
 
-    assign current_led_value = led_data[current_led];
+    assign current_led_value = led_data_snapshot[current_led];
+
+    always_ff @(posedge clk) begin
+        if((state == IDLE) && update_matrix) begin
+            led_data_snapshot <= led_data;
+            state <= TRANSMITTING;
+        end
+    end
 
     // Create a counter for the reset cycle
     logic [$clog2(TICKS_TO_RESET) - 1:0] reset_counter = 0;
 
-    logic update_matrix_prev = 0;
-    logic update_matrix_rise;
-
-    assign update_matrix_rise = (!update_matrix_prev && update_matrix);
-
     always_ff @(posedge clk) begin
-        update_matrix_prev <= update_matrix;
-
         if(state == RESETTING) begin
             if(reset_counter == TICKS_TO_RESET - 1) begin
                 reset_counter <= 0;
@@ -110,11 +113,6 @@ module matrix_control #(
             end
             else begin
                 reset_counter <= reset_counter + 1;
-            end
-        end
-        else if(state == IDLE) begin
-            if(update_matrix_rise) begin
-                state <= TRANSMITTING;
             end
         end
     end
