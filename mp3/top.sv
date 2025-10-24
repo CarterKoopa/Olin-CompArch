@@ -18,7 +18,8 @@ module top (
     parameter NUM_COLORS = 3;
     
     // LED data array
-    logic [NUM_LEDS-1:0][23:0] led_data;
+    logic [NUM_LEDS-1:0][23:0] led_data = 0;
+    logic [NUM_LEDS-1:0][23:0] led_data_reg = 0;
     
     // State variable
     logic update_matrix;
@@ -33,15 +34,15 @@ module top (
         .matrix_output(_48b)
     );
 
-    typedef enum {IDLE, UPDATING} transmitting_state;
-    transmitting_state current_state = IDLE;
+    typedef enum {IDLE, TRANSMITTING, UPDATING} transmitting_state;
+    transmitting_state current_state;
 
     // Timing variables
     // 24 bits per LED, 15 click cycles per bit
-    parameter TIME_TO_UPDATE = NUM_LEDS * 24 * 15;
+    parameter TIME_TO_UPDATE = (NUM_LEDS * 24 * 15) + 1;
     logic [$clog2(TIME_TO_UPDATE) - 1:0] matrix_update_counter = 0;
 
-    parameter FRAMES_PER_SECOND = 10;
+    parameter FRAMES_PER_SECOND = 30;
     parameter TICKS_PER_FRAME = 12000000 / FRAMES_PER_SECOND;
     logic [$clog2(TICKS_PER_FRAME) - 1:0] frame_interval_counter = 0;
 
@@ -85,7 +86,7 @@ module top (
     end
 
     always_ff @(posedge clk) begin
-        if(current_state == UPDATING) begin
+        if(current_state == TRANSMITTING) begin
             if(matrix_update_counter == TIME_TO_UPDATE - 1) begin
                 matrix_update_counter <= 0;
                 current_state <= IDLE;
@@ -96,43 +97,43 @@ module top (
         end
     end
 
-    assign update_matrix = (current_state == UPDATING) ? 1'b1 : 1'b0;
+    assign update_matrix = (current_state == TRANSMITTING) ? 1'b1 : 1'b0;
 
-    always_comb begin
-        for(int i = 0; i < NUM_LEDS; i++) begin
-            if(num_leds_lit > i) begin
-                case(num_colors_lit)
-                    0: begin
-                        led_data[i] = 24'h800000;
-                    end
-                    1: begin
-                        led_data[i] = 24'h808000;
-                    end
-                    2: begin
-                        led_data[i] = 24'h808080;
-                    end
-                    default: begin
-                        led_data[i] = 0;
-                    end
-                endcase
+    logic [$clog2(NUM_LEDS) - 1:0] led_update_counter = 0;
+
+    always_ff @(posedge clk) begin
+        if(current_state == UPDATING) begin
+            if(led_update_counter == NUM_LEDS - 1) begin
+                led_update_counter <= 0;
+                current_state <= TRANSMITTING;
             end
             else begin
+                led_update_counter <= led_update_counter + 1;
+            end
+        end
+    end
+
+    always_comb begin
+        led_data = led_data_reg;
+        if(current_state == UPDATING) begin
+            if(num_leds_lit > led_update_counter) begin
                 case(num_colors_lit)
                     0: begin
-                        led_data[i] = 0;
+                        led_data[led_update_counter] = 24'h800000;
                     end
                     1: begin
-                        led_data[i] = 24'h800000;
+                        led_data[led_update_counter] = 24'h808000;
                     end
                     2: begin
-                        led_data[i] = 24'h808000;
-                    end
-                    default: begin
-                        led_data[i] = 0;
+                        led_data[led_update_counter] = 24'h808080;
                     end
                 endcase
             end
         end
+    end
+
+    always_ff @(negedge clk) begin
+        led_data_reg <= led_data;
     end
 
 endmodule
