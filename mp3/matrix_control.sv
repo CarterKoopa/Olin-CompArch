@@ -13,9 +13,11 @@ module matrix_control #(
 )
 (
     input logic clk,
-    input logic [NUM_LEDS-1:0][23:0] led_data,
+    input logic [NUM_LEDS-1:0][2:0] led_data,
     input logic update_matrix,
-    output logic matrix_output
+    output logic matrix_output,
+    output logic send_reset,
+    output logic on_code_signal
 );
 
     // Define the logic variables
@@ -23,12 +25,12 @@ module matrix_control #(
     // Track the 24-bit RGB signal for the current LED in the matrix
     logic [23:0] current_led_value;
     // Switch to reset the output at the end of the matrix
-    logic send_reset;
+    //logic send_reset;
     // Signal from the LED controller counter on when to send the next signal
     logic next_led;
     // Create a register to store a snapshot of the led_data so that it's not
     // updated during transmission.
-    logic [NUM_LEDS-1:0][23:0] led_data_snapshot = 0;
+    logic [NUM_LEDS-1:0][2:0] led_data_snapshot = 0;
 
     // Implement the underlying WS2812B LED Controller
     led_control #(
@@ -38,7 +40,7 @@ module matrix_control #(
         .rgb_input      (current_led_value),
         .resetting      (send_reset),
         .next_led       (next_led),
-        .led_signal     (matrix_output)
+        .led_signal     (matrix_output),
     );
 
     // Define counter variables
@@ -46,75 +48,86 @@ module matrix_control #(
 
 
     // Define state machine states
-    typedef enum {TRANSMITTING, RESETTING, IDLE} matrix_state;
-    matrix_state state;
+    typedef enum logic [2:0] {
+        IDLE         = 3'b001,
+        TRANSMITTING = 3'b010,
+        RESETTING    = 3'b100
+        } matrix_state;
+    matrix_state state = IDLE;
 
-    // This sequential block waits for the signal from the led_control to
-    // increment to the next LED in the matrix. This should only occur at the
-    // falling edge of next_led, which means the last bit from the LED has just
-    // finished transmitting.
-    //
-    // The negedge implementation introduces a multi-clock domain, which can
-    // be potentially problematic for timing.
-    
-    always_ff @(negedge next_led) begin
-        if(state == TRANSMITTING) begin
-            if(current_led == NUM_LEDS - 1) begin
-                state <= RESETTING;
-                current_led <= 0;
+    always_comb begin
+        case(led_data_snapshot[current_led])
+            3'b000: begin
+                current_led_value = 24'h000000;
             end
-            else begin
-                current_led <= current_led + 1;
+            3'b001: begin
+                current_led_value = 24'h000080;
             end
-        end
-    end
-    
-
-    /*
-    // Some test code that currently a clock cycle delayed but doesn't intro.
-    // a multi-clock domain
-    logic next_led_prev = 0;
-    logic next_led_fell;
-
-    assign next_led_fell = (next_led_prev && !next_led);
-
-    always_ff @(posedge clk) begin
-        next_led_prev <= next_led;
-        
-        if(state == TRANSMITTING && next_led_fell) begin
-            if(current_led == NUM_LEDS - 1) begin
-                state <= RESETTING;
-                current_led <= 0;
+            3'b011: begin
+                current_led_value = 24'h008080;
             end
-            else begin
-                current_led <= current_led + 1;
+            3'b111: begin
+                current_led_value = 24'h808080;
             end
-        end
-    end
-    */
-
-    assign current_led_value = led_data_snapshot[current_led];
-
-    always_ff @(posedge clk) begin
-        if((state == IDLE) && update_matrix) begin
-            led_data_snapshot <= led_data;
-            state <= TRANSMITTING;
-        end
+            3'b110: begin
+                current_led_value = 24'h808080;
+            end
+            3'b100: begin
+                current_led_value = 24'h808080;
+            end
+            default: begin
+                current_led_value = 24'h000000;
+            end
+        endcase
     end
 
     // Create a counter for the reset cycle
     logic [$clog2(TICKS_TO_RESET) - 1:0] reset_counter = 0;
+    parameter TIME_PER_BIT = 15;
+    logic [$clog2(TIME_PER_BIT) - 1:0] last_bit_timer = 0;
+    logic last_bit = 1'b0;
 
     always_ff @(posedge clk) begin
-        if(state == RESETTING) begin
-            if(reset_counter == TICKS_TO_RESET - 1) begin
-                reset_counter <= 0;
-                state <= IDLE;
+        case(state)
+            RESETTING: begin
+                if(reset_counter == TICKS_TO_RESET - 1) begin
+                    reset_counter <= 0;
+                    state <= IDLE;
+                end
+                else begin
+                    reset_counter <= reset_counter + 1;
+                end
             end
-            else begin
-                reset_counter <= reset_counter + 1;
+            IDLE: begin
+                if(update_matrix) begin
+                    led_data_snapshot <= led_data;
+                    state <= TRANSMITTING;
+                end
             end
-        end
+            TRANSMITTING: begin
+                if(next_led) begin
+                    last_bit = 1'b1;
+                end
+                if(last_bit) begin
+                    if(last_bit_timer == TIME_PER_BIT - 1) begin
+                        if(current_led == NUM_LEDS - 1) begin
+                            state <= RESETTING;
+                            current_led <= 0;
+                            last_bit_timer <= 0;
+                            last_bit = 1'b0;
+                        end
+                        else begin
+                            current_led <= current_led + 1;
+                            last_bit_timer <= 0;
+                            last_bit = 1'b0;
+                        end
+                    end
+                    else begin
+                        last_bit_timer <= last_bit_timer + 1;
+                    end
+                end
+            end
+        endcase
     end
     
     assign send_reset = (state == RESETTING || state == IDLE);

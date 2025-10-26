@@ -92,6 +92,6 @@ module top(
     end
 
     assign _48b = ws2812b_out;
-    assign _45a = ~ws2812b_out;
+    assign _45a = clk;
 
 endmodule
