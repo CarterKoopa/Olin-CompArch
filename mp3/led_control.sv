@@ -35,7 +35,7 @@ module led_control #(
     // Create counters
     logic [$clog2(TICKS_PER_CYCLE) - 1:0] current_cycle_count = 0;
     logic [$clog2(BITS_PER_LED)    - 1:0] current_bit = BITS_PER_LED - 1;
-    //logic on_code_signal;
+    logic on_code_signal;
     logic off_code_signal;
 
     initial begin

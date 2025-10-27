@@ -16,8 +16,6 @@ module matrix_control #(
     input logic [NUM_LEDS-1:0][2:0] led_data,
     input logic update_matrix,
     output logic matrix_output,
-    output logic send_reset,
-    output logic on_code_signal
 );
 
     // Define the logic variables
@@ -25,7 +23,7 @@ module matrix_control #(
     // Track the 24-bit RGB signal for the current LED in the matrix
     logic [23:0] current_led_value;
     // Switch to reset the output at the end of the matrix
-    //logic send_reset;
+    logic send_reset;
     // Signal from the LED controller counter on when to send the next signal
     logic next_led;
     // Create a register to store a snapshot of the led_data so that it's not
