@@ -15,7 +15,7 @@ module game_of_life #(
     input logic clk,
     input logic update_game,
     input logic [(BOARD_HEIGHT*BOARD_WIDTH) -1:0] starting_pattern,
-    output logic [(BOARD_HEIGHT*BOARD_WIDTH) -1:0] current_pattern
+    output logic [(BOARD_HEIGHT*BOARD_WIDTH) -1:0] current_pattern = 64'b0000000001100000011000000000000000000000000000000000000000000000
 );
     
     // Start defining game parameters
@@ -25,20 +25,21 @@ module game_of_life #(
     logic [(BOARD_HEIGHT*BOARD_WIDTH) -1:0] next_pattern = 0;
 
     // Create an enum for the FSM
-    typedef enum logic [2:0] {
+    typedef enum logic [1:0] {
         IDLE     = 2'b00,
         UPDATING = 2'b01,
         START    = 2'b10
     } game_states;
     // Default to the start state to initialize values
-    game_states current_state = START;
+    game_states current_state = IDLE;
 
     // Create counter variables
     parameter TIME_PER_FRAME = 12000000 / UPDATES_PER_SECOND;
     parameter NUM_NEIGHBORS = 8;
     parameter UPDATE_TIME = NUM_CELLS * (NUM_NEIGHBORS + 1); // Add one extra for final computation cycle
-    logic [$clog2(NUM_CELLS) - 1:0] current_cell = 0;
-    logic [$clog2(NUM_NEIGHBORS) - 1:0] current_neighbor = 0;
+    logic [$clog2(NUM_CELLS - 1):0] current_cell = 0;
+    logic [$clog2(NUM_NEIGHBORS):0] current_neighbor = 0; // intentionally no -1 here
+    logic [$clog2(NUM_CELLS - 1) - 1:0] alive_neighbors = 0;
 
 
     // Count position in the grid for updating
@@ -50,15 +51,24 @@ module game_of_life #(
         case(current_state)
             // START: the default value that only runs at boot and sets the
             // current pattern to the starting pattern, then defaults to idle.
+            /*
             START: begin
                 current_pattern <= starting_pattern;
                 current_state <= IDLE;
+                current_cell <= 0;
+                next_pattern <= '0;
+                column_number <= 0;
+                row_number <= 0;
+                current_neighbor <= 0;
+                alive_neighbors <= 0;
             end
+            */
             // IDLE: do nothing, count up until it is time to compute the next
             // step.
             IDLE: begin
+                next_pattern <= '0;
                 if(update_game) begin
-                    current_state <= update;
+                    current_state <= UPDATING;
                 end
             end
             // Main logic block. Calculate the next iteration of the board, and
@@ -67,11 +77,12 @@ module game_of_life #(
                 // First level if: loop through all of the individual cells.
                 // Once all cells have been updated, set the output pattern and
                 // return to idle state.
-                if(current_cell == NUM_CELLS - 1) begin
+                if(current_cell == NUM_CELLS) begin
                     current_cell <= 0;
                     current_neighbor <= 0;
                     current_state <= IDLE;
                     current_pattern <= next_pattern;
+                    alive_neighbors <= 0;
                 end
                 else begin
                     // Second level: loop through all of the neighbors of the
@@ -115,10 +126,10 @@ module game_of_life #(
 
     // Create variables to store the neighbor target to check so that the board
     // correctly wraps around
-    logic [$clog2(BOARD_HEIGHT) - 1:0] row_back = 0;
-    logic [$clog2(BOARD_HEIGHT) - 1:0] row_forward = 0;
-    logic [$clog2(BOARD_WIDTH) - 1:0] col_back = 0;
-    logic [$clog2(BOARD_WIDTH) - 1:0] col_forward = 0;
+    logic [$clog2(BOARD_HEIGHT) - 1:0] row_back;
+    logic [$clog2(BOARD_HEIGHT) - 1:0] row_forward;
+    logic [$clog2(BOARD_WIDTH) - 1:0] column_back;
+    logic [$clog2(BOARD_WIDTH) - 1:0] column_forward;
     
     // Based on the current cell as set above, the corresponding neighbors are
     // computed based on the principle that the graph wraps around.
@@ -127,10 +138,10 @@ module game_of_life #(
     // with some better math, but the translation back and forth made enough
     // sense to me at the time I was writing it.
     always_comb begin
-        row_back    = row_number    == 0              ? BOARD_HEIGHT - 1 : row_number - 1;
-        row_forward = row_number    == BOARD_HEIGHT-1 ? 0                : row_number + 1;
-        col_back    = column_number == 0              ? BOARD_WIDTH-1    : column_number - 1;
-        col_forward = column_number == BOARD_WIDTH-1  ? 0                : column_number + 1;
+        row_back       = row_number    == 0              ? BOARD_HEIGHT - 1 : row_number - 1;
+        row_forward    = row_number    == BOARD_HEIGHT-1 ? 0                : row_number + 1;
+        column_back    = column_number == 0              ? BOARD_WIDTH-1    : column_number - 1;
+        column_forward = column_number == BOARD_WIDTH-1  ? 0                : column_number + 1;
     end
 
     // One neighbor is evaluated on each clock cycle. For each evaluation, if
@@ -140,13 +151,13 @@ module game_of_life #(
     // The final 8-th neighbor case computes the next iteration of the game
     // based on the game rules and saves this in the next copy of gameboard
     // such that current version remains in-tact for further evaluation.
-    logic [$clog2(NUM_CELLS - 1) - 1:0] alive_neighbors = 0;
+
     always_ff @(negedge clk) begin
         if(current_state == UPDATING) begin
             case(current_neighbor)
                 0: begin
                     // Top left
-                    alive_neighbors <= alive_neighbors + current_pattern[(row_back * BOARD_WIDTH) + col_back];
+                    alive_neighbors <= alive_neighbors + current_pattern[(row_back * BOARD_WIDTH) + column_back];
                 end
                 1: begin
                     // Top center
@@ -158,15 +169,15 @@ module game_of_life #(
                 end
                 3: begin
                     // Left
-                    alive_neighbors <= alive_neighbors + current_pattern[(row_number * BOARD_WIDTH) + col_back];
+                    alive_neighbors <= alive_neighbors + current_pattern[(row_number * BOARD_WIDTH) + column_back];
                 end
                 4: begin
                     // Right
-                    alive_neighbors <= alive_neighbors + current_pattern[(row_number * BOARD_WIDTH) + col_forward];
+                    alive_neighbors <= alive_neighbors + current_pattern[(row_number * BOARD_WIDTH) + column_forward];
                 end
                 5: begin
                     // Bottom left
-                    alive_neighbors <= alive_neighbors + current_pattern[(row_forward * BOARD_WIDTH) + col_back];
+                    alive_neighbors <= alive_neighbors + current_pattern[(row_forward * BOARD_WIDTH) + column_back];
                 end
                 6: begin
                     // Bottom center
@@ -181,11 +192,11 @@ module game_of_life #(
                     // alive, it should continue living.
                     if(current_pattern[(row_number * BOARD_WIDTH) + column_number]) begin
                         // Continue living if 2 or 3 living neighbors.
-                        if(alive_neighbors == 2 || alive_neighbors == 3) begin
-                            next_pattern[(row_number * BOARD_WIDTH) + column_number] = 1'b1;
+                        if((alive_neighbors == 2) || (alive_neighbors == 3)) begin
+                            next_pattern[(row_number * BOARD_WIDTH) + column_number] <= 1'b1;
                         end
                         else begin
-                            next_pattern[(row_number * BOARD_WIDTH) + column_number] = 1'b0;
+                            next_pattern[(row_number * BOARD_WIDTH) + column_number] <= 1'b0;
                         end
                     end
                     // This else checks if the cell should be brought alive if
@@ -193,10 +204,10 @@ module game_of_life #(
                     else begin
                         // Dead cells only become alive if they have 3 neighbors
                         if(alive_neighbors == 3) begin
-                            next_pattern[(row_number * BOARD_WIDTH) + column_number] = 1'b1;
+                            next_pattern[(row_number * BOARD_WIDTH) + column_number] <= 1'b1;
                         end
                         else begin
-                            next_pattern[(row_number * BOARD_WIDTH) + column_number] = 1'b0;
+                            next_pattern[(row_number * BOARD_WIDTH) + column_number] <= 1'b0;
                         end
                     end
                 end

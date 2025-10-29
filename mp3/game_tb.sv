@@ -1,27 +1,23 @@
 `timescale 10ns/10ns
 `include "top.sv"
 
-module led_tb;
+module game_tb;
 
     // Clock and RGB outputs
     logic clk = 0;
     logic _48b;
-    logic _49a;
     logic _45a;
-    logic LED;
     
     top u0 (
         .clk(clk),
         ._48b(_48b),
-        ._45a(_45a),
-        ._49a(_49a),
-        .LED(LED)
+        ._45a(_45a)
     );
 
     initial begin
-        $dumpfile("led_tb.vcd");
-        $dumpvars(0, led_tb);
-        #200000000
+        $dumpfile("game_tb.vcd");
+        $dumpvars(0, game_tb);
+        #500000000
         //4
         $finish;
     end

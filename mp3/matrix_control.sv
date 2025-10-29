@@ -15,7 +15,7 @@ module matrix_control #(
     input logic clk,
     input logic [NUM_LEDS-1:0][2:0] led_data,
     input logic update_matrix,
-    output logic matrix_output,
+    output logic matrix_output
 );
 
     // Define the logic variables
@@ -38,7 +38,7 @@ module matrix_control #(
         .rgb_input      (current_led_value),
         .resetting      (send_reset),
         .next_led       (next_led),
-        .led_signal     (matrix_output),
+        .led_signal     (matrix_output)
     );
 
     // Define counter variables
@@ -59,22 +59,28 @@ module matrix_control #(
                 current_led_value = 24'h000000;
             end
             3'b001: begin
-                current_led_value = 24'h000080;
+                current_led_value = 24'h0000F0;
             end
             3'b011: begin
-                current_led_value = 24'h008080;
+                current_led_value = 24'h00F0F0;
             end
             3'b111: begin
-                current_led_value = 24'h808080;
+                current_led_value = 24'hF0F0F0;
             end
             3'b110: begin
-                current_led_value = 24'h808080;
+                current_led_value = 24'hF0F000;
             end
             3'b100: begin
                 current_led_value = 24'h808080;
             end
+            3'b010: begin
+                current_led_value = 24'h00F000;
+            end
+            3'b101: begin
+                current_led_value = 24'hF000F0;
+            end
             default: begin
-                current_led_value = 24'h000000;
+                current_led_value = 24'hF00010;
             end
         endcase
     end

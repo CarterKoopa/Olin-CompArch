@@ -7,11 +7,14 @@
 //
 // Author: Carter Harris
 `include "matrix_control.sv"
+`include "game_of_life.sv"
 
 module top(
     input logic clk,
-    input logic [2:0] color,
-    output logic _48b  // Matrix data output
+    output logic _48b,  // Matrix data output
+    output logic _45a,
+    output logic _49a,
+    output logic LED
 );
     // Parameters
     parameter BOARD_WIDTH = 8;
@@ -22,7 +25,8 @@ module top(
     logic [NUM_LEDS-1:0][2:0] led_data = 0;
 
     // Game pattern array
-    logic [NUM_LEDS - 1:0] pattern = 0;
+    logic [NUM_LEDS - 1:0] pattern;
+    logic [NUM_LEDS - 1:0] start_pattern = 64'b0000000001100000011000000000000000000000000000000000000000000000;
     
     // State variable
     logic update_matrix;
@@ -36,7 +40,7 @@ module top(
         .clk            (clk),
         .led_data       (led_data),
         .update_matrix  (update_matrix),
-        .matrix_output  (ws2812_out),
+        .matrix_output  (ws2812_out)
     );
 
 
@@ -47,15 +51,15 @@ module top(
     ) game (
         .clk              (clk),
         .update_game      (update_game),
-        .starting_pattern (64'b0000000001100000010000000000100000011000000000000000000000000000),
-        .current_pattern  (current_pattern)
+        .starting_pattern (64'b0000000001100000011000000000000000000000000000000000000000000000),
+        .current_pattern  (pattern)
     );
 
     typedef enum logic [2:0] {
         IDLE          = 3'b001, 
         TRANSMITTING  = 3'b010, 
         UPDATE_MATRIX = 3'b100,
-        UPDATE_GAME   = 3'b111,
+        UPDATE_GAME   = 3'b111
     } transmitting_state;
 
     transmitting_state current_state = IDLE;
@@ -64,17 +68,19 @@ module top(
     // 24 bits per LED, 15 click cycles per bit
     parameter TIME_TO_UPDATE = (NUM_LEDS * 24 * 15) + 1;
     logic [$clog2(TIME_TO_UPDATE) - 1:0] matrix_update_counter = 0;
+    logic [$clog2(NUM_LEDS) - 1:0] led_update_counter = 0;
 
-    parameter FRAMES_PER_SECOND = 30;
+    parameter FRAMES_PER_SECOND = 5;
     parameter TICKS_PER_FRAME = (12000000 / FRAMES_PER_SECOND) - TIME_TO_UPDATE;
     logic [$clog2(TICKS_PER_FRAME) - 1:0] frame_interval_counter = 0;
 
     //
     // 9 = 8 neighbors + 1 logic clock cycle
     // Plus one cycle of lag for the game to update after flag set
-    parameter TIME_TO_UPDATE_GAME = (NUM_LEDS * (9)) + 1;
+    parameter TIME_TO_UPDATE_GAME = (NUM_LEDS * (9)) + 1 + 50;
     logic [$clog2(TIME_TO_UPDATE_GAME) - 1:0] game_update_counter = 0;
 
+    logic test_bit = 0;
 
     always_ff @(posedge clk) begin
         case(current_state)
@@ -119,26 +125,21 @@ module top(
 
      always_ff @(negedge clk) begin
         if(current_state == UPDATE_MATRIX) begin
-            if(current_pattern[matrix_update_counter]) begin
-                case(color)
-                    3'b100: begin
-                        led_data[led_update_counter][2:0] <= 3'b100;
-                    end
-                    3'b010: begin
-                        led_data[led_update_counter][2:0] <= 3'b110;
-                    end
-                    3'b001: begin
-                        led_data[led_update_counter][2:0] <= 3'b111;
-                    end
-                endcase
+            if(pattern[led_update_counter]) begin
+                led_data[led_update_counter] <= 3'b100;
+            end
+            else begin
+                led_data[led_update_counter] <= 3'b000;
             end
         end
     end
 
     assign update_matrix = (current_state == TRANSMITTING);
 
-    assign update_game = (current_state == UPDATE_GAME)
+    assign update_game = (current_state == UPDATE_GAME);
 
     assign _48b = ws2812_out;
+    
+    assign _45a = (led_update_counter == 0);
 
 endmodule

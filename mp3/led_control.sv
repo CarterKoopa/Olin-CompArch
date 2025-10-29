@@ -26,7 +26,7 @@ module led_control #(
     input logic [23:0] rgb_input,
     input logic resetting,
     output logic next_led,
-    output logic led_signal,
+    output logic led_signal
 );
     // This first section only deals with creating the on-off code for each
     // individual bit of the LED. Actually assigning to the output based on the
