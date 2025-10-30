@@ -2,8 +2,8 @@
 // Mini-Project 3 - Game of Life
 // Olin Computer Architecture FA25
 //
-// Top-level test module for WS2812B LED matrix
-// Cycles through all 64 LEDs in Red, Blue, Green order over 15 seconds
+// Top-level test module for implementing three independent copies of Conway's
+// Game of Life on an 8x8 LED matrix. 
 //
 // Author: Carter Harris
 `include "matrix_control.sv"
