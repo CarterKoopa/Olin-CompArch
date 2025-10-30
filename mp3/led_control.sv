@@ -25,7 +25,7 @@ module led_control #(
     input logic clk,
     input logic [23:0] rgb_input,
     input logic resetting,
-    output logic next_led,
+    output logic next_led = 0,
     output logic led_signal
 );
     // This first section only deals with creating the on-off code for each
@@ -37,10 +37,6 @@ module led_control #(
     logic [$clog2(BITS_PER_LED)    - 1:0] current_bit = BITS_PER_LED - 1;
     logic on_code_signal;
     logic off_code_signal;
-
-    initial begin
-        next_led = 0;
-    end
     
     // Count ticks in the current bit cycle
     always_ff @(posedge clk) begin

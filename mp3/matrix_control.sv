@@ -53,34 +53,37 @@ module matrix_control #(
         } matrix_state;
     matrix_state state = IDLE;
 
+    // Because the higher level modules provide a binary on-off for each LED
+    // color, translate that into a 24-bit value of roughly half brightness for
+    // transmission to the LED.
     always_comb begin
         case(led_data_snapshot[current_led])
             3'b000: begin
                 current_led_value = 24'h000000;
             end
             3'b001: begin
-                current_led_value = 24'h0000F0;
+                current_led_value = 24'h000080;
             end
             3'b011: begin
-                current_led_value = 24'h00F0F0;
+                current_led_value = 24'h008080;
             end
             3'b111: begin
-                current_led_value = 24'hF0F0F0;
-            end
-            3'b110: begin
-                current_led_value = 24'hF0F000;
-            end
-            3'b100: begin
                 current_led_value = 24'h808080;
             end
+            3'b110: begin
+                current_led_value = 24'h808000;
+            end
+            3'b100: begin
+                current_led_value = 24'h800000;
+            end
             3'b010: begin
-                current_led_value = 24'h00F000;
+                current_led_value = 24'h008000;
             end
             3'b101: begin
-                current_led_value = 24'hF000F0;
+                current_led_value = 24'h800080;
             end
             default: begin
-                current_led_value = 24'hF00010;
+                current_led_value = 24'h000000;
             end
         endcase
     end
@@ -91,8 +94,12 @@ module matrix_control #(
     logic [$clog2(TIME_PER_BIT) - 1:0] last_bit_timer = 0;
     logic last_bit = 1'b0;
 
+    // Main state machine.
     always_ff @(posedge clk) begin
         case(state)
+            // When the matrix is resetting (ie, after a complete transmission),
+            // the output is held at zero to ensure the signal stays low long
+            // enough for the WS2812 LEDs to stay off. 
             RESETTING: begin
                 if(reset_counter == TICKS_TO_RESET - 1) begin
                     reset_counter <= 0;
@@ -102,12 +109,19 @@ module matrix_control #(
                     reset_counter <= reset_counter + 1;
                 end
             end
+            // Once a sufficient off-time to reset has been reached, the state
+            // translates to IDLE and awaits a signal to update.
+            // A snapshot of the data is taken upon moving to the next state
+            // to ensure that data is not changed mid-transmission.
             IDLE: begin
                 if(update_matrix) begin
                     led_data_snapshot <= led_data;
                     state <= TRANSMITTING;
                 end
             end
+            // Once transmitting, the LED data is sent one by one to the LED
+            // controller. The loop tracks when the controller is sending
+            // the last bit of the LED and prepares to update to the next bit.
             TRANSMITTING: begin
                 if(next_led) begin
                     last_bit = 1'b1;
@@ -134,6 +148,9 @@ module matrix_control #(
         endcase
     end
     
+    // While the reset state is nominally the only place where the output has
+    // to be zero, it is held at zero throughout the idle period too to prevent
+    // any unintended or half-transmissions.
     assign send_reset = (state == RESETTING || state == IDLE);
 
 
